@@ -1,0 +1,13 @@
+# ── Office lock files ────────────────────────────────
+~$*.xls*
+~$*.doc*
+~$*.ppt*
+
+# ── Build artifacts ──────────────────────────────────
+/build/
+/dist/
+
+# ── KiCad & manufacturing reports ────────────────────
+*.rpt
+*.html
+*.toc
