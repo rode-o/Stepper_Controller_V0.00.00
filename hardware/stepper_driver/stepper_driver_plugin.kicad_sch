@@ -4318,12 +4318,6 @@
 		(uuid "6b868395-ff6e-4f78-a856-47abb0e639b6")
 	)
 	(junction
-		(at 215.9 59.69)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "6d3826e7-5b49-4660-b0e7-d86eb9770b71")
-	)
-	(junction
 		(at 231.14 123.19)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -4556,16 +4550,6 @@
 			(type default)
 		)
 		(uuid "13413d0f-78d7-496b-99e9-d2308067ac25")
-	)
-	(wire
-		(pts
-			(xy 210.82 59.69) (xy 215.9 59.69)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "15c3eb44-a643-4d47-ae4e-67505a19d0e9")
 	)
 	(wire
 		(pts
@@ -4849,16 +4833,6 @@
 	)
 	(wire
 		(pts
-			(xy 217.17 59.69) (xy 215.9 59.69)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "7b55240e-19a9-4335-b61d-4aa904df48d4")
-	)
-	(wire
-		(pts
 			(xy 171.45 121.92) (xy 171.45 120.65)
 		)
 		(stroke
@@ -5019,7 +4993,7 @@
 	)
 	(wire
 		(pts
-			(xy 210.82 62.23) (xy 215.9 62.23)
+			(xy 214.63 62.23) (xy 215.9 62.23)
 		)
 		(stroke
 			(width 0)
@@ -5099,6 +5073,16 @@
 	)
 	(wire
 		(pts
+			(xy 214.63 59.69) (xy 215.9 59.69)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ad46dd1e-f38c-42c6-bfda-642664725c0c")
+	)
+	(wire
+		(pts
 			(xy 165.1 115.57) (xy 171.45 115.57)
 		)
 		(stroke
@@ -5109,7 +5093,7 @@
 	)
 	(wire
 		(pts
-			(xy 210.82 57.15) (xy 215.9 57.15)
+			(xy 214.63 57.15) (xy 215.9 57.15)
 		)
 		(stroke
 			(width 0)
@@ -5299,7 +5283,7 @@
 	)
 	(wire
 		(pts
-			(xy 210.82 54.61) (xy 215.9 54.61)
+			(xy 214.63 54.61) (xy 215.9 54.61)
 		)
 		(stroke
 			(width 0)
@@ -5510,13 +5494,13 @@
 		(uuid "6b3f26e7-1647-4a81-87d7-dcfe2d0ca4e0")
 	)
 	(label "SCL"
-		(at 210.82 62.23 0)
+		(at 214.63 62.23 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
-			(justify left bottom)
+			(justify right bottom)
 		)
 		(uuid "79910cd9-e7d2-4003-9b14-d217ea3ea99c")
 	)
@@ -5620,13 +5604,13 @@
 		(uuid "b1c9337c-f537-45f5-a946-627f4538dfe9")
 	)
 	(label "SDA"
-		(at 210.82 54.61 0)
+		(at 214.63 54.61 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
-			(justify left bottom)
+			(justify right bottom)
 		)
 		(uuid "bf29eecb-a3a8-420d-9a37-3bab0912a30e")
 	)
@@ -5653,13 +5637,13 @@
 		(uuid "cb377b5b-851e-4ca8-986a-5a60f1525cbe")
 	)
 	(label "3_3"
-		(at 210.82 57.15 0)
+		(at 214.63 57.15 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
-			(justify left bottom)
+			(justify right bottom)
 		)
 		(uuid "d5bdcc11-81d0-4807-9e73-4049d985d731")
 	)
@@ -5697,13 +5681,13 @@
 		(uuid "e3752f19-a8b7-4b67-a3c6-7660f0e5d98b")
 	)
 	(label "GND"
-		(at 210.82 59.69 0)
+		(at 214.63 59.69 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
-			(justify left bottom)
+			(justify right bottom)
 		)
 		(uuid "e434bb83-3420-4073-82f6-1afb8de7d177")
 	)

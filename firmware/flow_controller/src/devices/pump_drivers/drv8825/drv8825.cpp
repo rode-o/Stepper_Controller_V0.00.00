@@ -1,0 +1,140 @@
+#include "drv8825.hpp"
+
+#ifdef ENABLE_DRV8825
+
+using namespace PumpDrv;
+
+/* 1/32 µ-step pattern, M0 tied LOW on the carrier */
+struct Mode { bool m0, m1, m2; };
+static constexpr Mode MODE_1_32{ false, true, true };
+
+/* internal state */
+namespace {
+    float  tgtSps = 0.0f;
+    float  curSps = 0.0f;
+    constexpr float PULSES_PER_REV = 200.0f * MICROSTEP_DIV;
+#if !(defined(ARDUINO_ARCH_RP2040) || defined(__AVR__))
+    volatile uint32_t halfPeriodUs = 0;
+    volatile bool     stepLevel    = false;
+    uint32_t          lastToggleUs = 0;
+#endif
+}
+
+/* -------- helper: drive mode pins & enables ------------------------- */
+static void setMicrostepPins(const Mode& m)
+{
+    digitalWrite(PIN_M1, m.m1);
+    digitalWrite(PIN_M2, m.m2);
+}
+static void driverEnable(bool en)
+{
+    digitalWrite(PIN_EN   , en ? LOW  : HIGH);
+    digitalWrite(PIN_SLEEP, en ? HIGH : LOW );
+}
+
+/* -------- RP2040 PWM slice backend ---------------------------------- */
+#if defined(ARDUINO_ARCH_RP2040)
+#include "hardware/pwm.h"
+static uint slice;
+static void hwSetFreq(uint32_t sps)
+{
+    if (!sps) { pwm_set_enabled(slice, false); return; }
+
+    uint32_t clk = clock_get_hz(clk_sys);
+    uint32_t top = clk / sps;
+    if (top) top -= 1; else top = 1;
+
+    pwm_set_wrap(slice, top);
+    pwm_set_chan_level(slice, PWM_CHAN_A, top / 2);
+    pwm_set_enabled(slice, true);
+}
+#elif defined(__AVR__)                       /* AVR fallback */
+static void hwSetFreq(uint32_t sps)
+{
+    if (!sps) { TCCR1B = 0; return; }
+    pinMode(PIN_STEP, OUTPUT);
+    TCCR1A = _BV(COM1A0);
+    TCCR1B = _BV(WGM12) | _BV(CS10);
+    uint32_t top = (F_CPU / (2UL * sps)) - 1;
+    if (top > 0xFFFF) top = 0xFFFF;
+    OCR1A = top;
+}
+#else                                         /* bit-bang fallback */
+static inline void hwSetFreq(uint32_t sps)
+{
+    halfPeriodUs = sps ? 500'000UL / sps : 0;
+}
+static inline void hwService()
+{
+    if (!halfPeriodUs) return;
+    uint32_t now = micros();
+    if (now - lastToggleUs >= halfPeriodUs) {
+        lastToggleUs = now;
+        stepLevel = !stepLevel;
+        digitalWrite(PIN_STEP, stepLevel);
+    }
+}
+#endif
+
+/* -------- API implementation ---------------------------------------- */
+void PumpDrv::initPump()
+{
+    pinMode(PIN_STEP , OUTPUT);
+    pinMode(PIN_DIR  , OUTPUT);
+    pinMode(PIN_EN   , OUTPUT);
+    pinMode(PIN_SLEEP, OUTPUT);
+
+#if defined(ARDUINO_ARCH_RP2040)
+    pinMode(PIN_M0, INPUT_PULLDOWN);
+#else
+    pinMode(PIN_M0, INPUT);
+    digitalWrite(PIN_M0, LOW);
+#endif
+    pinMode(PIN_M1, OUTPUT);
+    pinMode(PIN_M2, OUTPUT);
+
+    setMicrostepPins(MODE_1_32);
+
+    digitalWrite(PIN_DIR, HIGH);    // default direction
+    driverEnable(false);
+
+#if defined(ARDUINO_ARCH_RP2040)
+    slice = pwm_gpio_to_slice_num(PIN_STEP);
+    pwm_config cfg = pwm_get_default_config();
+    pwm_init(slice, &cfg, false);
+    gpio_set_function(PIN_STEP, GPIO_FUNC_PWM);
+#endif
+}
+
+void PumpDrv::setTargetSPS(float sps)
+{
+    if (sps < 0)       sps = 0;
+    if (sps > MAX_SPS) sps = MAX_SPS;
+    tgtSps = sps;
+}
+void PumpDrv::setTargetRPM(float rpm)
+{
+    float sps = (rpm / 60.0f) * PULSES_PER_REV;
+    setTargetSPS(sps);
+}
+float PumpDrv::currentSPS() { return curSps; }
+
+void PumpDrv::pumpService()
+{
+    if constexpr (ACCEL_SPS_PER_CYCLE) {
+        if (curSps < tgtSps)      curSps = min(curSps + ACCEL_SPS_PER_CYCLE, tgtSps);
+        else if (curSps > tgtSps) curSps = max(curSps - ACCEL_SPS_PER_CYCLE, tgtSps);
+    } else {
+        curSps = tgtSps;
+    }
+
+    if (curSps < MIN_SPS) { driverEnable(false); hwSetFreq(0); return; }
+    driverEnable(true);
+    hwSetFreq(static_cast<uint32_t>(curSps));
+
+#if !(defined(ARDUINO_ARCH_RP2040) || defined(__AVR__))
+    hwService();
+#endif
+}
+
+#endif /* ENABLE_DRV8825 */
