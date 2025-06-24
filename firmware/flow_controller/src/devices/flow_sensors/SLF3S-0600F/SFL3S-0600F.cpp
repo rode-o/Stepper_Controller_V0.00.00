@@ -67,12 +67,12 @@ float readFlow()
                               (1.0f - State::getErrorPercent() / 100.0f);
     float compensated_uLmin = _rawFlow_uLmin * compFactor;
 
-    return compensated_uLmin / 1000.0f;      // → mL/min
+    return compensated_uLmin;
 }
 
 /* ───── simple accessors ──────────────────────────────────── */
-float     getTempC()     { return _rawTempC;                       }
-uint16_t  getLastFlags() { return _lastFlags;                      }
-float     getRawFlow()   { return _rawFlow_uLmin / 1000.0f; }      // mL/min
+float     getTempC()     { return _rawTempC;}          
+uint16_t  getLastFlags() { return _lastFlags;}
+float     getRawFlow()   { return _rawFlow_uLmin;}      // mL/min
 
 #endif // ENABLE_SFL3S_0600F

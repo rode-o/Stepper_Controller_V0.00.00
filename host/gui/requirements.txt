@@ -1,2 +1,0 @@
-pyserial
-PyQt6>=6.5

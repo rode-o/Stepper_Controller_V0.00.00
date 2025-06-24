@@ -1,36 +1,30 @@
 #include "min_ctrl.hpp"
-#include "../../min_main.hpp"                 // umbrella: devices, core, utils…
+#include "../../min_main.hpp"
 #include <PID_v1.h>
 
 #ifdef ENABLE_MIN_CTRL
 
-/* ── singletons ─────────────────────────────────────────── */
 static ButtonsTwo    gButtons;
 static Sh1107Display gDisplay;
-static VolumeTracker gVolume(0.97f);          // density ρ = 0.97 g mL⁻¹
+static VolumeTracker gVolume(0.97f);
 
-/* ── tube / pump constants ─────────────────────────────── */
-constexpr float UL_PER_REV  = 42.0f;          // µL delivered per shaft rev
-constexpr float START_RPM   = 60.0f;
-constexpr float START_uL    = START_RPM * UL_PER_REV;   // 60 rpm → 2 520 µL/min
+constexpr float UL_PER_REV = 42.0f;
+constexpr float START_RPM  = 60.0f;
+constexpr float START_uL   = START_RPM * UL_PER_REV;
 
-/* ── global state (defined in system_state.cpp) ────────── */
 extern volatile SystemState g_state;
 
-/* ── PID objects (pv & sp in µL/min, out in rpm) ───────── */
-double pv  = 0.0;                             // process value  [µL / min]
-double sp  = START_uL;                        // set-point      [µL / min]
-double out = START_RPM;                       // controller out [RPM]
-
-/*    Gains are still “RPM per µL/min”.  Tune later if needed.    */
+/* PID in µL/min -> RPM */
+double pv  = 0, sp = START_uL, out = START_RPM;
 PID flowPid(&pv, &out, &sp, 5.0, 0.5, 0.0, DIRECT);
 
-/* ── volume integration timing ─────────────────────────── */
 static unsigned long prevVolMs = 0;
 
-/* ── SETUP ─────────────────────────────────────────────── */
 void ctrlSetup()
 {
+    State::loadPersistent(); 
+    State::setPumpEnabled(false);                       // restore set-point & err%
+
     Serial.begin(115200);
     while (!Serial && millis() < 2000) {}
 
@@ -43,63 +37,63 @@ void ctrlSetup()
         Serial.println(F("[MIN_CTRL] Flow-sensor init FAILED"));
 
     PumpDrv::initPump();
-    PumpDrv::setTargetRPM(0);                 // user enables later
+    PumpDrv::setTargetRPM(0);
 
-    g_state.setpoint   = START_uL;            // store in µL / min
-    g_state.volume_uL  = 0;
-    g_state.mass_g     = 0;
+    if (g_state.setpoint == 0)                   // first boot fallback
+        State::setSetpoint(START_uL);
 
-    flowPid.SetOutputLimits(0, 200);          // RPM clamp
-    flowPid.SetSampleTime(100);               // 100 ms loop
+    sp = g_state.setpoint;                       // sync PID
+
+    flowPid.SetOutputLimits(0, 200);
+    flowPid.SetSampleTime(100);
     flowPid.SetMode(AUTOMATIC);
 
     prevVolMs = millis();
 }
 
-/* ── LOOP ──────────────────────────────────────────────── */
 void ctrlLoop()
 {
     g_state.currentTimeMs = millis();
 
-    /* 1. buttons -------------------------------------------------- */
     gButtons.poll();
     if (gButtons.pageChanged()) gDisplay.advancePage();
 
-    /* 2. sensor read --------------------------------------------- */
-    float flow_mL = readFlow();               // mL / min (already calibrated)
-    pv            = flow_mL * 1000.0f;        // convert to µL / min
-    g_state.flow  = flow_mL;                  // keep mL/min for UI
+    float flow_mL = readFlow();                  // mL/min
+    pv            = flow_mL * 1000.0f;           // -> µL/min
+    g_state.flow  = flow_mL;
 
-    /* ---- volume accumulator ------------------------------------ */
     unsigned long now = g_state.currentTimeMs;
-    gVolume.update(pv, now - prevVolMs);      // pv is already µL / min
+    gVolume.update(pv, now - prevVolMs);
     prevVolMs = now;
 
     g_state.volume_uL = gVolume.volume_uL();
     g_state.mass_g    = gVolume.mass_g();
 
-    /* 3. PID & pump gating --------------------------------------- */
-    sp = g_state.setpoint;                    // µL / min from ButtonsTwo
+    sp = g_state.setpoint;                       // live set-point
     if (g_state.pumpEnabled) {
-        flowPid.Compute();                    // out updated (RPM)
+        flowPid.Compute();
         g_state.rpmCmd = out;
     } else {
         out            = 0;
         g_state.rpmCmd = 0;
     }
 
-    PumpDrv::setTargetRPM(out);               // driver still wants RPM
+    PumpDrv::setTargetRPM(out);
     PumpDrv::pumpService();
     g_state.spsCmd = PumpDrv::currentSPS();
 
-    /* 4. JSON report every 250 ms -------------------------------- */
-    static uint32_t last = 0;
-    if (g_state.currentTimeMs - last >= 250) {
-        last = g_state.currentTimeMs;
+    static uint32_t lastJson = 0;
+    if (g_state.currentTimeMs - lastJson >= 250) {
+        lastJson = g_state.currentTimeMs;
         SerialRpt::emitJSON(g_state);
     }
 
-    /* 5. OLED refresh -------------------------------------------- */
+    static uint32_t lastFlush = 0;
+    if (g_state.currentTimeMs - lastFlush >= 5000) {
+        State::commitPersistent();
+        lastFlush = g_state.currentTimeMs;
+    }
+
     gDisplay.show(State::read());
 }
 
