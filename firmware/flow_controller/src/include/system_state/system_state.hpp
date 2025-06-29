@@ -1,72 +1,72 @@
 #pragma once
 #include <Arduino.h>
 
-/* ───── RGB status ─────────────────────────────────────────── */
+/* ─── RGB enum (needed by rgb.hpp) ─── */
 enum LEDColour : uint8_t { LED_OFF, LED_RED, LED_GREEN, LED_BLUE, LED_AMBER };
 
-/* ───── Control-mode enum ─────────────────────────────────── */
-enum ControlMode : uint8_t {
-    CONTROL_MODE_EXP = 0,
-    CONTROL_MODE_CONST_VOLTAGE
-};
-
-/* ───── Global runtime snapshot ───────────────────────────── */
+/* ─── Runtime snapshot ───
+ * NB: Only setpoint & pumpEnabled persist to EEPROM; all other
+ *     members are live-telemetry only.
+ */
 struct SystemState {
-    /* timing ------------------------------------------------ */
     unsigned long currentTimeMs{0};
 
-    /* sensors ----------------------------------------------- */
-    float flow{0};
-    float setpoint{0};        // stored in µL / min
-    float errorPercent{0};
-    float temperature{0};
-    bool  bubbleDetected{false};
+    /* user parameters & control */
+    float setpoint{0};        // µL / min target
+    float calScalar{0};       // user calibration scalar (±%)
 
-    /* flags ------------------------------------------------- */
-    bool systemOn{false};
-    ControlMode controlMode{CONTROL_MODE_EXP};
+    /* flow telemetry */
+    float r_flow{0};          // raw   flow  (µL / min)
+    float f_flow{0};          // filtered flow
 
-    /* controller diagnostics -------------------------------- */
-    float pidOutput{0}, desiredVoltage{0};
-    float pTerm{0}, iTerm{0}, dTerm{0};
-    float pGain{0}, iGain{0}, dGain{0};
-    float filteredError{0}, currentAlpha{0};
-
-    /* pump & valve ------------------------------------------ */
-    bool pumpEnabled{false};
-    bool pumpReverse{false};
-
-    /* driver commands --------------------------------------- */
+    /* controller commands (live) */
     float rpmCmd{0};
     float spsCmd{0};
+    uint16_t topCmd{0};       // ★ NEW: PWM wrap value actually applied
 
-    /* shared LED colour ------------------------------------- */
-    LEDColour ledColour{LED_OFF};
-
-    /* cumulative totals ------------------------------------- */
+    /* totals */
     float volume_uL{0};
     float mass_g{0};
+
+    /* state flags */
+    bool  pumpEnabled{false};
+    bool  systemOn{false};
+    bool  calibrating{false};
+
+    LEDColour ledColour{LED_OFF};
 };
 
-/* ───── namespace State — zero-copy access helpers ───────── */
-namespace State {
-    /* live read-only snapshot */
-    const volatile SystemState& read();          // defined in system_state.cpp
+/* global snapshot instance */
+extern volatile SystemState g_state;
 
-    /* setters that persist */
-    void setSetpoint(float uLmin);               //  ← NEW prototype
-    void setErrorPercent(float pct);             // clamps to ±50
+/* ─── State helpers & persistence ─── */
+namespace State {
+    extern bool g_dirty;
+
+    /* snapshot read-only accessor */
+    const volatile SystemState& read();
+
+    /* EEPROM helpers (store set-point & pump flag only) */
+    void loadPersistent();
+    void commitPersistent();
+
+    /* setters (some mark EEPROM dirty) */
+    void setSetpoint(float v);          // µL/min
     void setPumpEnabled(bool en);
     void setSystemOn(bool on);
-    void setLEDColour(LEDColour c);              // not persisted
 
-    /* persistence helpers */
-    void loadPersistent();       // call once in setup()
-    void commitPersistent();     // call periodically
+    void setRawFlow (float v);
+    void setFiltFlow(float v);
+    void setRPM(float rpm);
+    void setSPS(float sps);
+    void setTop(uint16_t top);          // ★ NEW
+    void setCalScalar(float p);
+    void addVolume(float uL);
+    void addMass(float g);
+    void setLEDColour(LEDColour c);
 
-    /* inline trivial getters */
-    inline float     getErrorPercent() { return read().errorPercent; }
-    inline bool      isPumpEnabled()  { return read().pumpEnabled;  }
-    inline bool      isSystemOn()     { return read().systemOn;     }
-    inline LEDColour getLEDColour()   { return read().ledColour;    }
-}
+    /* getters */
+    bool  isPumpEnabled();
+    bool  isSystemOn();
+    float getCalScalar();
+}   // namespace State

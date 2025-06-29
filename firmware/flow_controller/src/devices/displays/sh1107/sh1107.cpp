@@ -1,12 +1,14 @@
 #include "sh1107.hpp"
+#include "../../../ctrl/exp_ctrl/egc_calibration_config.hpp"   // CAL_TOTAL_MS
+#include "../../../min_main.hpp"     // SystemState, etc.
 
 #ifdef ENABLE_SH1107
 
 /* ───── helpers ───────────────────────────────────────── */
-static inline float mL_to_uL(float mL) { return mL * 1000.0f; }
 
-/* CP-437 symbols */
-static inline void printPlusMinus(Adafruit_SH1107& d){ d.print((char)241);} // ±
+/* CP-437 ± symbol */
+static inline void printPlusMinus(Adafruit_SH1107& d)
+{ d.print((char)241); }
 
 /* ───── public interface ─────────────────────────────── */
 bool Sh1107Display::begin()
@@ -24,43 +26,52 @@ bool Sh1107Display::begin()
 
 void Sh1107Display::advancePage() { mPage = (mPage + 1) % PAGES; }
 
+/* ───── dispatcher ───────────────────────────────────── */
 void Sh1107Display::show(const volatile SystemState& s)
 {
+    if (s.calibrating) {          // modal progress bar overrides pages
+        drawCalProgress();
+        mDisp.display();
+        return;
+    }
+
     switch (mPage) {
-        case 0: drawSetFlowPage  (s); break;
-        case 1: drawMeasuredPage (s); break;
-        default:drawErrorCalPage (s); break;
+        case 0: drawSetFlowPage   (s); break;
+        case 1: drawMeasuredPage  (s); break;
+        case 2: drawCalScalarPage (s); break;
+        default: drawInitCalPage  (s); break;
     }
     mDisp.display();
 }
 
-/* ───── private draw helpers ─────────────────────────── */
+/* ───── page helpers ─────────────────────────────────── */
 void Sh1107Display::drawSetFlowPage(const volatile SystemState& s)
 {
     mDisp.clearDisplay();
     mDisp.setFont();
 
-    /* top preview: measured flow */
+    /* top: raw flow preview */
     mDisp.setCursor(0, 0);
     mDisp.print(F("Meas "));
-    mDisp.print(mL_to_uL(s.flow), 0);
+    mDisp.print(s.r_flow, 0);
     mDisp.print(F(" uL/min"));
 
-    /* centre: set-point (editable) */
+    /* centre: set-point */
     char buf[20];
     snprintf(buf, sizeof(buf), "%.0f uL/min", s.setpoint);
     mDisp.setTextSize(2);
     int16_t bx, by; uint16_t bw, bh;
     mDisp.getTextBounds(buf, 0, 0, &bx, &by, &bw, &bh);
-    mDisp.setCursor((mDisp.width() - bw) / 2, (mDisp.height() - bh) / 2 - 4);
+    mDisp.setCursor((mDisp.width() - bw) / 2,
+                    (mDisp.height() - bh) / 2 - 4);
     mDisp.print(buf);
     mDisp.setTextSize(1);
 
-    /* bottom preview: error calibration */
+    /* bottom: cal-scalar */
     mDisp.setCursor(0, mDisp.height() - 8);
-    mDisp.print(F("Err "));
+    mDisp.print(F("Cal "));
     printPlusMinus(mDisp);
-    mDisp.print(s.errorPercent, 0);
+    mDisp.print(s.calScalar, 0);
     mDisp.print('%');
 }
 
@@ -69,57 +80,108 @@ void Sh1107Display::drawMeasuredPage(const volatile SystemState& s)
     mDisp.clearDisplay();
     mDisp.setFont();
 
-    /* top preview: set-point */
+    /* top: set-point */
     mDisp.setCursor(0, 0);
     mDisp.print(F("Set "));
     mDisp.print(s.setpoint, 0);
     mDisp.print(F(" uL/min"));
 
-    /* centre: measured flow */
+    /* centre: filtered flow */
     char buf[20];
-    snprintf(buf, sizeof(buf), "%.0f uL/min", mL_to_uL(s.flow));
+    snprintf(buf, sizeof(buf), "%.0f uL/min", s.f_flow);
     mDisp.setTextSize(2);
     int16_t bx, by; uint16_t bw, bh;
     mDisp.getTextBounds(buf, 0, 0, &bx, &by, &bw, &bh);
-    mDisp.setCursor((mDisp.width() - bw) / 2, (mDisp.height() - bh) / 2 - 4);
+    mDisp.setCursor((mDisp.width() - bw) / 2,
+                    (mDisp.height() - bh) / 2 - 4);
     mDisp.print(buf);
     mDisp.setTextSize(1);
 
-    /* bottom preview: error calibration */
+    /* bottom: cal-scalar */
     mDisp.setCursor(0, mDisp.height() - 8);
-    mDisp.print(F("Err "));
+    mDisp.print(F("Cal "));
     printPlusMinus(mDisp);
-    mDisp.print(s.errorPercent, 0);
+    mDisp.print(s.calScalar, 0);
     mDisp.print('%');
 }
 
-void Sh1107Display::drawErrorCalPage(const volatile SystemState& s)
+void Sh1107Display::drawCalScalarPage(const volatile SystemState& s)
 {
     mDisp.clearDisplay();
     mDisp.setFont();
 
-    /* top preview: set-point */
+    /* top: set-point */
     mDisp.setCursor(0, 0);
     mDisp.print(F("Set "));
     mDisp.print(s.setpoint, 0);
     mDisp.print(F(" uL/min"));
 
-    /* centre: error % */
+    /* centre: ±cal-scalar */
     char buf[16];
-    buf[0] = 241;                                 // ± symbol
-    snprintf(buf + 1, sizeof(buf) - 1, "%.0f %%", s.errorPercent);
+    buf[0] = 241;   // ±
+    snprintf(buf + 1, sizeof(buf) - 1, "%.0f %%", s.calScalar);
     mDisp.setTextSize(2);
     int16_t bx, by; uint16_t bw, bh;
     mDisp.getTextBounds(buf, 0, 0, &bx, &by, &bw, &bh);
-    mDisp.setCursor((mDisp.width() - bw) / 2, (mDisp.height() - bh) / 2 - 4);
+    mDisp.setCursor((mDisp.width() - bw) / 2,
+                    (mDisp.height() - bh) / 2 - 4);
     mDisp.print(buf);
     mDisp.setTextSize(1);
 
-    /* bottom preview: measured flow */
+    /* bottom: raw flow preview */
     mDisp.setCursor(0, mDisp.height() - 8);
     mDisp.print(F("Meas "));
-    mDisp.print(mL_to_uL(s.flow), 0);
+    mDisp.print(s.r_flow, 0);
     mDisp.print(F(" uL/min"));
+}
+
+void Sh1107Display::drawInitCalPage(const volatile SystemState&)
+{
+    mDisp.clearDisplay();
+    mDisp.setFont();
+
+    const char* msg = "Init Cal?";
+    mDisp.setTextSize(2);
+    int16_t bx, by; uint16_t bw, bh;
+    mDisp.getTextBounds(msg, 0, 0, &bx, &by, &bw, &bh);
+    mDisp.setCursor((mDisp.width() - bw) / 2,
+                    (mDisp.height() - bh) / 2 - 4);
+    mDisp.print(msg);
+    mDisp.setTextSize(1);
+
+    mDisp.setCursor(0, mDisp.height() - 8);
+    mDisp.print(F("Hold 5s to run"));
+}
+
+/* ───── calibration progress bar ─────────────────────── */
+void Sh1107Display::drawCalProgress()
+{
+    extern volatile uint32_t gCalibStart;
+
+    mDisp.clearDisplay();
+    mDisp.setFont();
+
+    mDisp.setCursor(0, 0);
+    mDisp.print(F("Calibrating…"));
+
+    uint32_t elapsed = millis() - gCalibStart;
+    if (elapsed > CAL_TOTAL_MS) elapsed = CAL_TOTAL_MS;
+    float pct = elapsed * 100.0f / CAL_TOTAL_MS;
+
+    constexpr int BAR_W = 100, BAR_H = 6;
+    int filled = static_cast<int>(BAR_W * pct / 100.0f);
+    int x = (mDisp.width()  - BAR_W) / 2;
+    int y = (mDisp.height() - BAR_H) / 2;
+
+    mDisp.drawRect(x, y, BAR_W, BAR_H, SH110X_WHITE);
+    if (filled > 2)
+        mDisp.fillRect(x + 1, y + 1, filled - 2, BAR_H - 2, SH110X_WHITE);
+
+    char buf[8]; snprintf(buf, sizeof(buf), "%3.0f%%", pct);
+    int16_t bx, by; uint16_t bw, bh;
+    mDisp.getTextBounds(buf, 0, 0, &bx, &by, &bw, &bh);
+    mDisp.setCursor((mDisp.width() - bw) / 2, y + BAR_H + 4);
+    mDisp.print(buf);
 }
 
 #endif // ENABLE_SH1107

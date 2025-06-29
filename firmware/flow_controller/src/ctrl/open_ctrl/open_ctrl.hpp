@@ -3,10 +3,6 @@
 
 #include "../../include/_include.hpp"
 
-/*
- * File: constant_voltage_control.h
- * Brief: Provides a constant-voltage control mode for the Bartels pump.
- */
 
 // Initializes any required state for constant-voltage control
 void initConstantVoltageControl();

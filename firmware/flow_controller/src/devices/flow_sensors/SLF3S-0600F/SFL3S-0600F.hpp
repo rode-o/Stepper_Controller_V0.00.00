@@ -1,31 +1,30 @@
 #pragma once
-/*  SFL3S-0600F.hpp  –  minimal driver wrapper
- *  -------------------------------------------------
- *  Public API (always returns / accepts mL·min⁻¹):
- *      bool  startFlowMeasurement();
- *      bool  stopFlowMeasurement();
- *      float readFlow();          // compensated flow  (mL/min)
- *      float getTempC();          // last °C
- *      uint16_t getLastFlags();   // status bits
- *      float getRawFlow();        // raw, no calibration (mL/min)
+/*  SFL3S-0600F.hpp  –  wrapper for Sensirion SLF3S-0600F
+ *  All flow values are in µL·min⁻¹.
  *
- *  Requires:
- *      • SensirionI2cSf06Lf  (driver)
- *      • getErrorPercent()   (user calibration)  from _include.hpp
- *
- *  Compile this file only when ENABLE_SFL3S_0600F is defined.
+ *  Functions (enabled when ENABLE_SFL3S_0600F is defined):
+ *      startFlowMeasurement / stopFlowMeasurement
+ *      readFlow()           -> compensated, µL·min⁻¹
+ *      getTempC()           -> °C
+ *      getLastFlags()       -> status bits
+ *      getRawFlow()         -> un-compensated, µL·min⁻¹
  */
 
 #include <stdint.h>
 
+/* Provide the default I²C address only if the driver header lacks it */
+#ifndef SLF3S_0600F_I2C_ADDR_08
+#define SLF3S_0600F_I2C_ADDR_08 0x08
+#endif
+
 #ifdef ENABLE_SFL3S_0600F
 
-/* ───── public API ─────────────────────────────────────────── */
 bool      startFlowMeasurement();
 bool      stopFlowMeasurement();
-float     readFlow();           // compensated, mL/min
-float     getTempC();           // °C
-uint16_t  getLastFlags();       // raw status flags
-float     getRawFlow();         // un-compensated, mL/min
 
-#endif // ENABLE_SFL3S_0600F
+float     readFlow();           // µL·min⁻¹
+float     getTempC();           // °C
+uint16_t  getLastFlags();       // status bits
+float     getRawFlow();         // µL·min⁻¹ (raw)
+
+#endif /* ENABLE_SFL3S_0600F */

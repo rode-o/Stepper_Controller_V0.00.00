@@ -1,15 +1,13 @@
 #pragma once
-/* buttons_two.hpp – dual-button handler
+/*  buttons_two.hpp – dual-button handler
  *
- *  • Short press             : inc / dec values
- *  • Dual-press 1-5 s + release  : cycle OLED pages
- *  • Dual-press ≥5 s              : toggle pump, RGB green/red
- *  • UP long-press ≥1 s           : toggle systemOn flag
- *
- *  Paths fixed for nested build:
- *     ../../../include/_include.hpp
- *     ../../_devices.hpp
- * ─────────────────────────────────────────────────────────── */
+ *  Short press  UP / DN               :  ±10 µL min⁻¹ (SETPOINT) | ±1 % (CAL-SCALAR)
+ *  Dual-press 0.5–5 s (release)       :  page cycle  (SET → MEAS → CAL-SCALAR → CAL → …)
+ *  Dual-press ≥5 s                    :  pump toggle (any page except CAL)  OR
+ *                                        run calibration (CAL page)
+ *  Long-press  UP ≥1 s                :  systemOn toggle
+ */
+
 #include <Arduino.h>
 #include "../../../include/_include.hpp"
 #include "../../_devices.hpp"
@@ -23,31 +21,28 @@ public:
     bool pageChanged() const { return mPageEdge; }
 
 private:
-    enum class Mode : uint8_t { SETPOINT, MEASURE, ERROR };
+    enum class Mode : uint8_t { SETPOINT, MEASURE, CALSCALAR, CALIB };
 
-    /* tweak to taste */
-    static constexpr uint32_t PAGE_HOLD_MS = 500;   // 1 s
-    static constexpr uint32_t PUMP_HOLD_MS = 5000;   // 5 s
-    static constexpr uint32_t DEBOUNCE_MS  = 20;     // single-button inc/dec
+    /* timings (ms) */
+    static constexpr uint32_t PAGE_HOLD_MS = 500;
+    static constexpr uint32_t PUMP_HOLD_MS = 5000;
+    static constexpr uint32_t DEBOUNCE_MS  = 20;
 
-    /* dual-press tracking */
+    /* dual-press bookkeeping */
     uint32_t mDualStart{0};
     bool     mDualActive{false};
     bool     mPumpLatched{false};
 
-    /* other state */
-    Mode     mMode{Mode::SETPOINT};
-    int16_t  mNumberVal{0};
-    int16_t  mLetterIdx{0};
+    /* editable state */
+    Mode     mMode        {Mode::SETPOINT};
+    int32_t  mNumberVal   {0};    // µL/min
+    int16_t  mLetterIdx   {0};    // cal-scalar %
+    uint8_t  mLastMask    {0};
+    bool     mPageEdge    {false};
+    bool     mPumpEnabled {false};
 
-    uint8_t  mLastMask{0};
-    bool     mPageEdge{false};
-
-    bool     mPumpEnabled{false};
-
-    /* helpers */
     void announce(const char* tag, float v) const;
     void updateLED();
 };
 
-#endif // ENABLE_BUTTONS_TWO
+#endif /* ENABLE_BUTTONS_TWO */
