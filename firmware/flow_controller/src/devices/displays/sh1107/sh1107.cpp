@@ -1,14 +1,11 @@
+/*─────────────────────────────────────────────────────────────*/
+/*  sh1107.cpp – OLED page driver                              */
+/*─────────────────────────────────────────────────────────────*/
+
 #include "sh1107.hpp"
-#include "../../../ctrl/exp_ctrl/egc_calibration_config.hpp"   // CAL_TOTAL_MS
-#include "../../../min_main.hpp"     // SystemState, etc.
+#include "../../../main.hpp"          // SystemState, etc.
 
 #ifdef ENABLE_SH1107
-
-/* ───── helpers ───────────────────────────────────────── */
-
-/* CP-437 ± symbol */
-static inline void printPlusMinus(Adafruit_SH1107& d)
-{ d.print((char)241); }
 
 /* ───── public interface ─────────────────────────────── */
 bool Sh1107Display::begin()
@@ -29,45 +26,72 @@ void Sh1107Display::advancePage() { mPage = (mPage + 1) % PAGES; }
 /* ───── dispatcher ───────────────────────────────────── */
 void Sh1107Display::show(const volatile SystemState& s)
 {
-    if (s.calibrating) {          // modal progress bar overrides pages
-        drawCalProgress();
-        mDisp.display();
-        return;
-    }
-
     switch (mPage) {
-        case 0: drawSetFlowPage   (s); break;
-        case 1: drawMeasuredPage  (s); break;
-        case 2: drawCalScalarPage (s); break;
-        default: drawInitCalPage  (s); break;
+        case 0: drawModePage     (s); break;
+        case 1: drawSetPointPage (s); break;
+        case 2: drawMeasuredPage (s); break;
+        default:drawCalScalarPage(s); break;   // page 3
     }
     mDisp.display();
 }
 
-/* ───── page helpers ─────────────────────────────────── */
-void Sh1107Display::drawSetFlowPage(const volatile SystemState& s)
+/* ───── page 0 : CTRL MODE ───────────────────────────── */
+void Sh1107Display::drawModePage(const volatile SystemState& s)
 {
     mDisp.clearDisplay();
     mDisp.setFont();
 
-    /* top: raw flow preview */
     mDisp.setCursor(0, 0);
-    mDisp.print(F("Meas "));
-    mDisp.print(s.r_flow, 0);
-    mDisp.print(F(" uL/min"));
+    mDisp.print(F("CTRL MODE"));
 
-    /* centre: set-point */
-    char buf[20];
-    snprintf(buf, sizeof(buf), "%.0f uL/min", s.setpoint);
+    const char* modeStr =
+        (s.ctrlMode == ControlMode::CLOSED) ? "CLOSED" : "OPEN";
+
+    mDisp.setTextSize(2);
+    int16_t bx, by; uint16_t bw, bh;
+    mDisp.getTextBounds(modeStr, 0, 0, &bx, &by, &bw, &bh);
+    mDisp.setCursor((mDisp.width()  - bw) / 2,
+                    (mDisp.height() - bh) / 2 - 4);
+    mDisp.print(modeStr);
+    mDisp.setTextSize(1);
+
+    mDisp.setCursor(0, mDisp.height() - 8);
+    mDisp.print(F("Tap \x18/\x19 to toggle"));   // up/down arrows
+}
+
+/* ───── page 1 : SET-POINT / RPM ─────────────────────── */
+void Sh1107Display::drawSetPointPage(const volatile SystemState& s)
+{
+    mDisp.clearDisplay();
+    mDisp.setFont();
+
+    /* top-line : saved set-point */
+    mDisp.setCursor(0, 0);
+    mDisp.print(F("Set "));
+    if (s.ctrlMode == ControlMode::CLOSED) {
+        mDisp.print(s.setFlow_uLmin, 0);
+        mDisp.print(F(" uL/min"));
+    } else {
+        mDisp.print(s.setRpm, 0);
+        mDisp.print(F(" rpm"));
+    }
+
+    /* centre : editable set-point (same number, large) */
+    char buf[24];
+    if (s.ctrlMode == ControlMode::CLOSED)
+        snprintf(buf, sizeof(buf), "%.0f uL/min", s.setFlow_uLmin);
+    else
+        snprintf(buf, sizeof(buf), "%.0f rpm", s.setRpm);
+
     mDisp.setTextSize(2);
     int16_t bx, by; uint16_t bw, bh;
     mDisp.getTextBounds(buf, 0, 0, &bx, &by, &bw, &bh);
-    mDisp.setCursor((mDisp.width() - bw) / 2,
+    mDisp.setCursor((mDisp.width()  - bw) / 2,
                     (mDisp.height() - bh) / 2 - 4);
     mDisp.print(buf);
     mDisp.setTextSize(1);
 
-    /* bottom: cal-scalar */
+    /* bottom : ±Cal scalar */
     mDisp.setCursor(0, mDisp.height() - 8);
     mDisp.print(F("Cal "));
     printPlusMinus(mDisp);
@@ -75,29 +99,35 @@ void Sh1107Display::drawSetFlowPage(const volatile SystemState& s)
     mDisp.print('%');
 }
 
+/* ───── page 2 : MEASURED (raw flow) ─────────────────── */
 void Sh1107Display::drawMeasuredPage(const volatile SystemState& s)
 {
     mDisp.clearDisplay();
     mDisp.setFont();
 
-    /* top: set-point */
+    /* top : target */
     mDisp.setCursor(0, 0);
     mDisp.print(F("Set "));
-    mDisp.print(s.setpoint, 0);
-    mDisp.print(F(" uL/min"));
+    if (s.ctrlMode == ControlMode::CLOSED) {
+        mDisp.print(s.setFlow_uLmin, 0);
+        mDisp.print(F(" uL/min"));
+    } else {
+        mDisp.print(s.setRpm, 0);
+        mDisp.print(F(" rpm"));
+    }
 
-    /* centre: filtered flow */
+    /* centre : raw measured flow */
     char buf[20];
-    snprintf(buf, sizeof(buf), "%.0f uL/min", s.f_flow);
+    snprintf(buf, sizeof(buf), "%.0f uL/min", s.r_flow);
     mDisp.setTextSize(2);
     int16_t bx, by; uint16_t bw, bh;
     mDisp.getTextBounds(buf, 0, 0, &bx, &by, &bw, &bh);
-    mDisp.setCursor((mDisp.width() - bw) / 2,
+    mDisp.setCursor((mDisp.width()  - bw) / 2,
                     (mDisp.height() - bh) / 2 - 4);
     mDisp.print(buf);
     mDisp.setTextSize(1);
 
-    /* bottom: cal-scalar */
+    /* bottom : ±Cal scalar */
     mDisp.setCursor(0, mDisp.height() - 8);
     mDisp.print(F("Cal "));
     printPlusMinus(mDisp);
@@ -105,83 +135,40 @@ void Sh1107Display::drawMeasuredPage(const volatile SystemState& s)
     mDisp.print('%');
 }
 
+/* ───── page 3 : ±Cal scalar ─────────────────────────── */
 void Sh1107Display::drawCalScalarPage(const volatile SystemState& s)
 {
     mDisp.clearDisplay();
     mDisp.setFont();
 
-    /* top: set-point */
+    /* top : target */
     mDisp.setCursor(0, 0);
     mDisp.print(F("Set "));
-    mDisp.print(s.setpoint, 0);
-    mDisp.print(F(" uL/min"));
+    if (s.ctrlMode == ControlMode::CLOSED) {
+        mDisp.print(s.setFlow_uLmin, 0);
+        mDisp.print(F(" uL/min"));
+    } else {
+        mDisp.print(s.setRpm, 0);
+        mDisp.print(F(" rpm"));
+    }
 
-    /* centre: ±cal-scalar */
+    /* centre : ±Cal % */
     char buf[16];
     buf[0] = 241;   // ±
     snprintf(buf + 1, sizeof(buf) - 1, "%.0f %%", s.calScalar);
     mDisp.setTextSize(2);
     int16_t bx, by; uint16_t bw, bh;
     mDisp.getTextBounds(buf, 0, 0, &bx, &by, &bw, &bh);
-    mDisp.setCursor((mDisp.width() - bw) / 2,
+    mDisp.setCursor((mDisp.width()  - bw) / 2,
                     (mDisp.height() - bh) / 2 - 4);
     mDisp.print(buf);
     mDisp.setTextSize(1);
 
-    /* bottom: raw flow preview */
+    /* bottom : raw flow preview */
     mDisp.setCursor(0, mDisp.height() - 8);
     mDisp.print(F("Meas "));
     mDisp.print(s.r_flow, 0);
     mDisp.print(F(" uL/min"));
 }
 
-void Sh1107Display::drawInitCalPage(const volatile SystemState&)
-{
-    mDisp.clearDisplay();
-    mDisp.setFont();
-
-    const char* msg = "Init Cal?";
-    mDisp.setTextSize(2);
-    int16_t bx, by; uint16_t bw, bh;
-    mDisp.getTextBounds(msg, 0, 0, &bx, &by, &bw, &bh);
-    mDisp.setCursor((mDisp.width() - bw) / 2,
-                    (mDisp.height() - bh) / 2 - 4);
-    mDisp.print(msg);
-    mDisp.setTextSize(1);
-
-    mDisp.setCursor(0, mDisp.height() - 8);
-    mDisp.print(F("Hold 5s to run"));
-}
-
-/* ───── calibration progress bar ─────────────────────── */
-void Sh1107Display::drawCalProgress()
-{
-    extern volatile uint32_t gCalibStart;
-
-    mDisp.clearDisplay();
-    mDisp.setFont();
-
-    mDisp.setCursor(0, 0);
-    mDisp.print(F("Calibrating…"));
-
-    uint32_t elapsed = millis() - gCalibStart;
-    if (elapsed > CAL_TOTAL_MS) elapsed = CAL_TOTAL_MS;
-    float pct = elapsed * 100.0f / CAL_TOTAL_MS;
-
-    constexpr int BAR_W = 100, BAR_H = 6;
-    int filled = static_cast<int>(BAR_W * pct / 100.0f);
-    int x = (mDisp.width()  - BAR_W) / 2;
-    int y = (mDisp.height() - BAR_H) / 2;
-
-    mDisp.drawRect(x, y, BAR_W, BAR_H, SH110X_WHITE);
-    if (filled > 2)
-        mDisp.fillRect(x + 1, y + 1, filled - 2, BAR_H - 2, SH110X_WHITE);
-
-    char buf[8]; snprintf(buf, sizeof(buf), "%3.0f%%", pct);
-    int16_t bx, by; uint16_t bw, bh;
-    mDisp.getTextBounds(buf, 0, 0, &bx, &by, &bw, &bh);
-    mDisp.setCursor((mDisp.width() - bw) / 2, y + BAR_H + 4);
-    mDisp.print(buf);
-}
-
-#endif // ENABLE_SH1107
+#endif /* ENABLE_SH1107 */

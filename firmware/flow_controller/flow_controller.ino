@@ -1,6 +1,6 @@
 
 #include <Arduino.h>
-#include "src/min_main.hpp"
+#include "src/main.hpp"
 
 void setup() {
     mainSetup();

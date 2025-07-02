@@ -1,5 +1,5 @@
 
-(footprint MOLEX_530470610 (layer F.Cu) (tedit 68336AA4)
+(footprint MOLEX_530470610 (layer F.Cu) (tedit 6862C62C)
   (descr "")
   (fp_text reference REF** (at -5.575 -3.635 0) (layer F.SilkS)
     (effects (font (size 1.0 1.0) (thickness 0.15)))

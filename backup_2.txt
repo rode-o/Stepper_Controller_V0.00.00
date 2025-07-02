@@ -46,7 +46,7 @@ static BiQuad biquad1(1*G1, 2*G1, 1*G1, -1.97114860885104f, 0.97139181456688f);
 /* ─── PID objects ─── */
 static double gMeasuredRate = 0, gPidOutput = 0, gTargetRate = 0;
 static PID    gPid(&gMeasuredRate, &gPidOutput, &gTargetRate,
-                   1.0, 0.30, 0.0, DIRECT);          // Kp, Ki, Kd
+                   1.0, 1, 0.0, DIRECT);          // Kp, Ki, Kd
 
 /* Geometry helper (RPM telemetry) */
 constexpr float STEPS_PER_REV = 200.0f * PumpDrv::MICROSTEP_DIV;
@@ -56,7 +56,7 @@ static inline uint16_t rateToTop(double uLmin)
 {
     const double vpr        = static_cast<double>(VPR);
     constexpr double SYSCLK = 125'000'000.0;          // Hz
-    constexpr double CLKDIV = 8.0;
+    constexpr double CLKDIV = 64.0;
     constexpr int    TPS    = 2;
     constexpr int    SPR    = 200;
     constexpr double TPR    = SPR * TPS;
@@ -97,7 +97,7 @@ void ctrlSetup()
     if (g_state.setpoint == 0)          State::setSetpoint(500.0f);
     gTargetRate = g_state.setpoint;
 
-    gPid.SetOutputLimits(50, 1500);     // low clamp raised from 0 → 50
+    gPid.SetOutputLimits(0, 1500);     // low clamp raised from 0 → 50
     gPid.SetSampleTime(100);            // 100 ms → 10 Hz
     gPid.SetMode(AUTOMATIC);
 

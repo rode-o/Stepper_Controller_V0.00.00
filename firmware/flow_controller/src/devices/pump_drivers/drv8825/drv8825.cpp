@@ -7,6 +7,11 @@ using namespace PumpDrv;
 struct Mode { bool m0, m1, m2; };
 static constexpr Mode MODE_1_32{ false, true, true };
 
+/* ------------------------------------------------------------------ */
+/* Centralised divider constant — MUST match min_ctrl.cpp             */
+constexpr float PWM_CLKDIV = 64.0f;          // was 8.0f
+/* ------------------------------------------------------------------ */
+
 /* ───── internal state ───── */
 namespace {
     float  tgtSps = 0.0f;
@@ -49,12 +54,17 @@ static inline void hwSetTop(uint16_t top)
     pwm_set_enabled(slice, true);                      // always ensure enabled
 }
 
-static inline void hwSetFreq(uint32_t sps)             /* legacy helper */
+/* Legacy helper kept for compatibility (speed-ramp interface) */
+static inline void hwSetFreq(uint32_t sps)
 {
     if (!sps) { hwSetTop(0); return; }
+
     uint32_t clk = clock_get_hz(clk_sys);
-    uint32_t top = clk / sps;
-    if (top) top -= 1; else top = 1;
+    uint32_t top = static_cast<uint32_t>(
+                      (clk / (PWM_CLKDIV * 2.0f * sps)) - 1.0f);
+
+    if (top < 1)      top = 1;
+    if (top > 0xFFFF) top = 0xFFFF;
     hwSetTop(static_cast<uint16_t>(top));
 }
 
@@ -120,7 +130,8 @@ void PumpDrv::initPump()
 #if defined(ARDUINO_ARCH_RP2040)
     slice = pwm_gpio_to_slice_num(PIN_STEP);
     pwm_config cfg = pwm_get_default_config();
-    pwm_init(slice, &cfg, false);
+    pwm_config_set_clkdiv(&cfg, PWM_CLKDIV);          // 8 → 64
+    pwm_init(slice, &cfg, false);                     // keep disabled for now
     gpio_set_function(PIN_STEP, GPIO_FUNC_PWM);
 #endif
 }
@@ -158,4 +169,8 @@ void PumpDrv::setTop(uint16_t top)
     else          driverEnable(true);
     hwSetTop(top);
 }
+
+/* ---- NEW fail-safe helper ---- */
+//inline void PumpDrv::stop() { setTop(0); }
+
 #endif  /* ENABLE_DRV8825 */
