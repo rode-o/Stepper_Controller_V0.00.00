@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "../flow_controller_α/firmware"
+		},
+		{
+			"name": "Flow_Box",
+			"path": "../Flow_Box"
+		}
+	],
+	"settings": {}
+}
