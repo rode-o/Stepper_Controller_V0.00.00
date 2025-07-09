@@ -32,7 +32,8 @@ bool ButtonsTwo::begin()
     RGB::begin();
 
     mFlowVal     = static_cast<int32_t>(State::read().setFlow_uLmin);
-    mRpmVal      = static_cast<int16_t>(State::read().setRpm);
+    /* store RPM × 10 so one tap = 0.1 RPM */
+    mRpmVal      = static_cast<int16_t>(State::read().setRpm * 10.0f + 0.5f);
     mCalIdx      = static_cast<int16_t>(State::read().calScalar);
     mPumpEnabled = State::isPumpEnabled();
     updateLED();
@@ -121,10 +122,12 @@ void ButtonsTwo::poll()
                 State::setFlow(static_cast<float>(mFlowVal));
                 announce("Flow", mFlowVal);
             } else {                                // OPEN
+                /* each tap changes RPM by 0.1 */
                 if (upRel && mRpmVal <= 32767 - 1)  mRpmVal += 1;
                 if (dnRel && mRpmVal >= 1)          mRpmVal -= 1;
-                State::setRpm(static_cast<float>(mRpmVal));
-                announce("RPM", mRpmVal);
+                float rpm = static_cast<float>(mRpmVal) / 10.0f;
+                State::setRpm(rpm);
+                announce("RPM", rpm);
             }
         }
 
@@ -160,7 +163,8 @@ void ButtonsTwo::announce(const char* tag, float v) const
     Serial.print(F("[BTN] "));
     Serial.print(tag);
     Serial.print(F(": "));
-    Serial.println(v, 0);
+    /* Print RPM with one decimal place, others as integers */
+    Serial.println(v, (strcmp(tag, "RPM") == 0 ? 1 : 0));
 }
 
 #endif /* ENABLE_BUTTONS_TWO */

@@ -25,10 +25,11 @@ constexpr float G0 = 0.0000613151978f,
 static BiQuad bi0(1*G0, 2*G0, 1*G0, -1.98780471f, 0.98804997f);
 static BiQuad bi1(1*G1, 2*G1, 1*G1, -1.97114861f, 0.97139181f);
 
-/* cumulative totals */
-static VolumeTracker gVol(0.97f);   // ρ = 0.97 g mL-¹
-} // namespace
+/* ── cumulative volume (authoritative) ──────────────────── */
+static double accVol_uL = 0.0;      // double avoids rollover
+constexpr float DENSITY_G_PER_ML = 0.97f;   // if you still care about mass
 
+} //namespace
 /* ───────────────────────────────────── PWM helpers ───────────────────────────────────── */
 uint16_t rateToTop(double uLmin)
 {
@@ -77,8 +78,10 @@ float readAndFilterFlow()
 
 void updateVolume(float flow_uLmin, uint32_t dtMs)
 {
-    gVol.update(flow_uLmin, dtMs);
+    /* ΔV = (Q / 60 000) · Δt   [µL] */
+    double dV = static_cast<double>(flow_uLmin) *
+                static_cast<double>(dtMs) / 60000.0;
 
-    g_state.volume_uL = gVol.volume_uL();
-    g_state.mass_g    = gVol.mass_g();
+    g_state.volume_uL += static_cast<float>(dV);
+    g_state.mass_g     = g_state.volume_uL * DENSITY_G_PER_ML / 1000.0f;
 }

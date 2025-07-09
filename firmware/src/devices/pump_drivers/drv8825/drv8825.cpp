@@ -34,6 +34,15 @@ static void setMicrostepPins(const Mode& m)
 }
 static void driverEnable(bool en)
 {
+    /* ── reset volume on rising edge ─────────────────────────────── */
+    static bool wasEnabled = false;
+    if (en && !wasEnabled) {           // pump just turned ON
+        g_state.volume_uL = 0;
+        g_state.mass_g    = 0;
+    }
+    wasEnabled = en;
+    /* -------------------------------------------------------------- */
+
     digitalWrite(PIN_EN   , en ? LOW  : HIGH);
     digitalWrite(PIN_SLEEP, en ? HIGH : LOW );
 }

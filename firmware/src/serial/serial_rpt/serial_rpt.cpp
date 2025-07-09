@@ -26,7 +26,8 @@ namespace SerialRpt
         Serial.print(F(",\"f_flw\":"));      Serial.print(st.f_flow,   0);   // filtered
 
         /* drive commands */
-        Serial.print(F(",\"rpm\":"));        Serial.print(st.rpmCmd, 1);
+        Serial.print(F(",\"rpm_cmd\":")); Serial.print(st.rpmCmd, 1);
+        Serial.print(F(",\"rpm_sp\":"));  Serial.print(st.setRpm, 1);
         Serial.print(F(",\"sps\":"));        Serial.print(st.spsCmd, 0);
         Serial.print(F(",\"top\":"));        Serial.print(st.topCmd);
 

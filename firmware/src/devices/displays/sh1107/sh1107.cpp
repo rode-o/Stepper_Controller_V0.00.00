@@ -33,16 +33,31 @@ void Sh1107Display::drawModeIcon(const volatile SystemState& s)
 
 void Sh1107Display::drawPumpIcon(const volatile SystemState& s)
 {
-    int16_t x = mDisp.width()  - 16;
-    int16_t y = mDisp.height() - 16;
+    /* icon position */
+    const int16_t xIcon = mDisp.width()  - 16;   // 12 px glyph + 2 px margin
+    const int16_t yIcon = mDisp.height() - 16;
+
+    /* cumulative volume string (e.g. “37550uL”) */
+    char buf[16];
+    snprintf(buf, sizeof buf, "%luuL", (unsigned long)s.volume_uL);
+
+    mDisp.setTextSize(1);                        // 6 × 8 px font
+    int16_t bx, by; uint16_t bw, bh;
+    mDisp.getTextBounds(buf, 0, 0, &bx, &by, &bw, &bh);
+
+    /* print text flush-right, 2 px left of the icon */
+    mDisp.setCursor(xIcon - 2 - bw, yIcon + 2);
+    mDisp.print(buf);
+
+    /* pump-state glyph */
     if (State::isPumpEnabled())
-        mDisp.fillRect(x, y, 12, 12, SH110X_WHITE);
+        mDisp.fillRect(xIcon, yIcon, 12, 12, SH110X_WHITE);   // ■
     else
-        mDisp.drawRect(x, y, 12, 12, SH110X_WHITE);
+        mDisp.drawRect(xIcon, yIcon, 12, 12, SH110X_WHITE);   // ▢
 }
 
 /* -------- dispatcher (no animation) ------------------------------- */
-void Sh1107Display::show(const volatile SystemState& s)
+void Sh1107Display::show(const volatile SystemState& s) 
 {
     renderCurrentPage(s);
     mDisp.display();
@@ -124,7 +139,7 @@ void Sh1107Display::drawSetPointPage(const volatile SystemState& s)
     if (s.ctrlMode == ControlMode::CLOSED)
         snprintf(buf, sizeof buf, "%.0f uL/min", s.setFlow_uLmin);
     else
-        snprintf(buf, sizeof buf, "%.0f rpm", s.setRpm);
+        snprintf(buf, sizeof buf, "%.1f rpm", s.setRpm);
 
     mDisp.setTextSize(2);
     int16_t bx, by; uint16_t bw, bh;
