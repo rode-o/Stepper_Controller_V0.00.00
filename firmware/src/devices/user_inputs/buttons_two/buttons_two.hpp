@@ -6,6 +6,7 @@
 #include "../../../include/_include.hpp"          // LED helpers, pin defs
 #include "../../_devices.hpp"
 #include "../../../ctrl/main_ctrl/main_ctrl.hpp"  // onModeChanged
+#include "../../../ui/_ui.hpp"            // UI::Btn + UI::Pages::*
 
 #ifdef ENABLE_BUTTONS_TWO
 
@@ -35,8 +36,7 @@ private:
     /* editable state */
     Page     mPage        {Page::SETPOINT};
     int32_t  mFlowVal     {0};   // µL/min (step 25)
-    int16_t  mRpmVal      {0};   // rpm    (step 1)
-    int16_t  mCalIdx      {0};   // ±%
+    int16_t  mRpmVal      {0};   // rpm    (step 0.1)
     uint8_t  mLastMask    {0};
     bool     mPageEdge    {false};
     bool     mPumpEnabled {false};

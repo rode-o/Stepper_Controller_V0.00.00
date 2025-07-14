@@ -12,7 +12,7 @@
 #include "core/_core.hpp"         // core helpers (filters, RGB, …)
 #include "ctrl/_ctrl.hpp"         // interface + concrete controllers
 #include "ctrl/main_ctrl/main_ctrl.hpp"   // ← NEW: orchestrator
-#include "utils/_utils.hpp"       // misc util libraries
+//#include "utils/_utils.hpp"       // misc util libraries
 
 /* entry points called from the .ino wrapper */
 void setup();

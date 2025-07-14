@@ -1,16 +1,22 @@
 #pragma once
 #include <Arduino.h>
 
+/* ───── enums ─────────────────────────────────────────────── */
 enum LEDColour : uint8_t { LED_OFF, LED_RED, LED_GREEN, LED_BLUE, LED_AMBER };
 enum class ControlMode : uint8_t { CLOSED = 0, OPEN = 1 };
 
+/* ───── global state record ───────────────────────────────── */
 struct SystemState {
     unsigned long currentTimeMs{0};
 
+    /* identity */
+    uint8_t  deviceId{0};                // unique board ID (0-255)
+
     /* user parameters */
-    float setFlow_uLmin{500};          // CLOSED mode target
-    float setRpm       {30};           // OPEN mode target
-    float calScalar    {0};
+    float setFlow_uLmin{500};            // CLOSED-loop target
+    float setRpm       {30};             // OPEN-loop target
+    float calScalar    {1};              // sensor gain (k_gain, default 1)
+    float vpr_uL_rev   {0};              // calibrated µL / rev (0 = unset)
 
     ControlMode ctrlMode{ControlMode::CLOSED};
 
@@ -33,13 +39,16 @@ struct SystemState {
 
 extern volatile SystemState g_state;
 
+/* ───── accessor helpers (namespace keeps sketch tidy) ────── */
 namespace State {
     extern bool g_dirty;
     const volatile SystemState& read();
 
+    /* EEPROM persistence */
     void loadPersistent();
     void commitPersistent();
 
+    /* parameter setters that mark EEPROM dirty when needed */
     void setFlow(float v);
     void setRpm (float v);
     void setCtrlMode(ControlMode m);
@@ -57,7 +66,12 @@ namespace State {
     void addMass(float g);
     void setLEDColour(LEDColour c);
 
+    /* new ID helpers */
+    void     setDeviceId(uint8_t id);    // store in EEPROM
+    uint8_t  getDeviceId();
+
+    /* lightweight getters */
     bool  isPumpEnabled();
     bool  isSystemOn();
     float getCalScalar();
-}
+}   // namespace State

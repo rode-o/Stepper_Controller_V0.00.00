@@ -21,7 +21,7 @@
 //_______________devices________________
 
     //_________display__________________
-    #define ENABLE_SH1107
+    //#define ENABLE_SH1107
     //#define ENABLE_SSD1306
 
     //_________flow_sensor______________

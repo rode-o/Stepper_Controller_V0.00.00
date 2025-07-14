@@ -149,6 +149,8 @@ constexpr uint16_t RATE_MIN_UL_MIN       = 200;
 constexpr uint16_t RATE_MAX_UL_MIN       = 1'800;   // ★ was 1 300
 constexpr uint8_t  DESIRED_TOLERANCE_PCT = 10;
 
+constexpr float VPR_DEFAULT = 42.0f;      // µL per revolution
+
 // ---------------------------------------------------------------------------
 // Human-readable serial tokens
 // ---------------------------------------------------------------------------
