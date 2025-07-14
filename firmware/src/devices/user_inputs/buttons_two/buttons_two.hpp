@@ -6,7 +6,7 @@
 #include "../../../include/_include.hpp"          // LED helpers, pin defs
 #include "../../_devices.hpp"
 #include "../../../ctrl/main_ctrl/main_ctrl.hpp"  // onModeChanged
-#include "../../../ui/_ui.hpp"            // UI::Btn + UI::Pages::*
+#include "../../../ui/_ui.hpp"                    // UI::Btn + UI::Pages::*
 
 #ifdef ENABLE_BUTTONS_TWO
 
@@ -16,12 +16,12 @@ public:
     void  poll();
 
     /* OLED-sync helpers (one-shot) */
-    bool     pageChanged();                          //  ← no const
+    bool     pageChanged();                                // ← no const
     uint8_t  currentPage() const { return static_cast<uint8_t>(mPage); }
 
 private:
-    /* three-page carousel: SET → MEAS → CAL → … */
-    enum class Page : uint8_t { SETPOINT, MEASURE, CALSCALAR };
+    /* four-page carousel: SET → MEAS → CAL → RPM → … */
+    enum class Page : uint8_t { SETPOINT, MEASURE, CALSCALAR, RPMSET };
 
     /* timings (ms) */
     static constexpr uint32_t PAGE_HOLD_MS = 500;

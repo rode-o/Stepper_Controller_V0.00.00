@@ -1,5 +1,5 @@
 /*─────────────────────────────────────────────────────────────*/
-/*  buttons_two.cpp – three-page carousel + Cal-wizard hooks   */
+/*  buttons_two.cpp – four-page carousel + Cal / RPM hooks     */
 /*─────────────────────────────────────────────────────────────*/
 #include "buttons_two.hpp"
 #include "../../../main.hpp"                     // PIN defs, State helpers
@@ -62,8 +62,8 @@ void ButtonsTwo::poll()
     uint8_t mask = (upLow ? 1 : 0) | (dnLow ? 2 : 0);
     uint32_t now = millis();
 
-    /* ===== dual-press logic ===================================== */
-    if (mask == 3) {                                 // both held
+    /* ===== dual-press logic ==================================== */
+    if (mask == 3) {                                  // both held
         if (!mDualActive) {
             mDualActive  = true;
             mDualStart   = now;
@@ -71,13 +71,13 @@ void ButtonsTwo::poll()
         }
         uint32_t held = now - mDualStart;
 
-        /* very long hold → pump toggle or wizard OK --------------- */
+        /* very long hold → pump toggle or wizard OK -------------- */
         if (held >= PUMP_HOLD_MS && !mPumpLatched) {
             mPumpLatched = true;
 
             if (mPage == Page::CALSCALAR) {
-                UI::Pages::handleCalButton(Btn::OK);     // long OK
-            } else {
+                UI::Pages::handleCalButton(Btn::OK);      // long OK
+            } else {                                     // incl. RPM-SET
                 mPumpEnabled = !mPumpEnabled;
                 State::setPumpEnabled(mPumpEnabled);
                 updateLED();
@@ -86,24 +86,25 @@ void ButtonsTwo::poll()
             }
         }
     }
-    else {                                           // released
+    else {                                            // released
         if (mDualActive) {
             uint32_t held = now - mDualStart;
 
-            /* ---- CASE 1: weight-editor caret step ---------------- */
+            /* ---- CASE 1: digit-caret step in Cal wizard -------- */
             if (mPage == Page::CALSCALAR &&
                 UI::gCalWizard.isEditingWeight() &&
                 held < PAGE_HOLD_MS)
             {
                 UI::Pages::handleCalButton(Btn::NEXT_DIGIT);
             }
-            /* ---- CASE 2: normal carousel swipe ------------------ */
+            /* ---- CASE 2: normal carousel swipe ---------------- */
             else if (!mPumpLatched && held < PUMP_HOLD_MS)
             {
                 switch (mPage) {
                     case Page::SETPOINT:  mPage = Page::MEASURE;   break;
                     case Page::MEASURE:   mPage = Page::CALSCALAR; break;
-                    default:              mPage = Page::SETPOINT;  break;
+                    case Page::CALSCALAR: mPage = Page::RPMSET;    break;
+                    default:              mPage = Page::SETPOINT;  break; // RPMSET → SETPOINT
                 }
                 mPageEdge = true;
                 Serial.print(F("[DBG] Carousel -> "));
@@ -113,14 +114,14 @@ void ButtonsTwo::poll()
         }
     }
 
-    /* ===== single-tap handling (debounced) ======================= */
+    /* ===== single-tap handling (debounced) ===================== */
     static uint32_t lastDeb = 0;
     if (mask != mLastMask && now - lastDeb > DEBOUNCE_MS) {
 
         bool upRel = (mLastMask == 1 && mask == 0);
         bool dnRel = (mLastMask == 2 && mask == 0);
 
-        /* forward ↑ / ↓ to Cal-wizard when we’re on that page ----- */
+        /* Cal-wizard page gets first dibs ------------------------ */
         if (mPage == Page::CALSCALAR && (upRel || dnRel)) {
             if (UI::Pages::handleCalButton(upRel ? Btn::UP : Btn::DOWN)) {
                 lastDeb   = now;
@@ -129,7 +130,16 @@ void ButtonsTwo::poll()
             }
         }
 
-        /* MEASURE page: toggle control mode ----------------------- */
+        /* RPM-SET page edits (±0.1 rpm) -------------------------- */
+        if (mPage == Page::RPMSET && (upRel || dnRel)) {
+            if (UI::Pages::handleRpmButton(upRel ? Btn::UP : Btn::DOWN)) {
+                lastDeb   = now;
+                mLastMask = mask;
+                return;                         // RPM page consumed
+            }
+        }
+
+        /* MEASURE page: toggle control mode --------------------- */
         if (mPage == Page::MEASURE && (upRel || dnRel)) {
             auto cur  = State::read().ctrlMode;
             auto next = (cur == ControlMode::CLOSED) ? ControlMode::OPEN
@@ -139,7 +149,7 @@ void ButtonsTwo::poll()
             RGB::flash(LED_BLUE, LED_GREEN);
         }
 
-        /* SETPOINT page edits ------------------------------------- */
+        /* SETPOINT page edits ----------------------------------- */
         if (mPage == Page::SETPOINT && (upRel || dnRel)) {
             constexpr int32_t STEP_UL_MIN = 25;       // 0.025 mL/min
 
@@ -166,7 +176,7 @@ void ButtonsTwo::poll()
     }
     mLastMask = mask;
 
-    /* ===== long hold on UP only → system ON/OFF ================== */
+    /* ===== long hold on UP only → system ON/OFF ================ */
     static uint32_t upHold = 0;
     if (upLow && !dnLow) {
         if (!upHold) upHold = now;

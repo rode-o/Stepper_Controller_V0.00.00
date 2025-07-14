@@ -6,7 +6,8 @@
 #include "page_set/page_set.hpp"
 #include "page_measured/page_measured.hpp"
 #include "page_cal_wizard/page_cal_wizard.hpp"
+#include "page_rpm_set/page_rpm_set.hpp"
 
 namespace UI::Pages {
-    constexpr uint8_t NUM_PAGES = 3;      // handy for DisplayMgr
+    constexpr uint8_t NUM_PAGES = 4;      // handy for DisplayMgr
 }

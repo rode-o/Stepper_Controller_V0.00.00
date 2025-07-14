@@ -1,21 +1,24 @@
 #include "page_rpm_set.hpp"
 #include "../../common/common.hpp"
+#include <algorithm>      // std::min / std::max
 
 using namespace UI;
 
-namespace {         // local constants
-constexpr float STEP_FINE  = 0.1f;   // rpm / short-press
-constexpr float STEP_COARSE= 1.0f;   // rpm / long-press
-constexpr float MAX_RPM    = 30.0f;  // safety clamp (adjust)
+/* ── local constants ──────────────────────────────────────── */
+namespace {
+constexpr float STEP    = 0.1f;   // rpm per tap
+constexpr float MAX_RPM = 30.0f;  // safety clamp
 }
 
+/* ── draw page ─────────────────────────────────────────────── */
 void Pages::drawRpmSet(Adafruit_SH1107& d,
                        const volatile SystemState& s)
 {
     d.clearDisplay();
 
     /* header -------------------------------------------------- */
-    d.setFont(); d.setCursor(0, 0);
+    d.setFont();
+    d.setCursor(0, 0);
     d.print(F("RPM SET  "));
     d.print((s.ctrlMode == ControlMode::OPEN) ? F("O") : F("C"));
 
@@ -36,25 +39,19 @@ void Pages::drawRpmSet(Adafruit_SH1107& d,
     drawCommonOverlay(d, s);
 }
 
+/* ── ▲ / ▼ handler (±0.1 rpm per tap) ─────────────────────── */
 bool Pages::handleRpmButton(UI::Btn b)
 {
-    auto& st = State::write();       // mutable
-    bool used = false;
+    float rpm = State::read().setRpm;
+    bool  used = false;
 
-    switch (b) {
-        case UI::Btn::UP:
-            st.setRpm = std::min(st.setRpm + STEP_FINE,  MAX_RPM); used = true; break;
-        case UI::Btn::DOWN:
-            st.setRpm = std::max(st.setRpm - STEP_FINE,  0.f);     used = true; break;
-        case UI::Btn::OK_LONG:                         // coarse step
-            st.setRpm = std::min(st.setRpm + STEP_COARSE, MAX_RPM); used = true; break;
-        case UI::Btn::OK:                              // toggle to OPEN
-            if (st.ctrlMode != ControlMode::OPEN) {
-                st.ctrlMode = ControlMode::OPEN;
-                used = true;
-            }
-            break;
-        default: break;
+    if (b == UI::Btn::UP)   { rpm = std::min(rpm + STEP, MAX_RPM); used = true; }
+    if (b == UI::Btn::DOWN) { rpm = std::max(rpm - STEP, 0.0f);    used = true; }
+
+    if (used) {
+        State::setRpm(rpm);                       // commit new target
+        if (State::read().ctrlMode != ControlMode::OPEN)
+            State::setCtrlMode(ControlMode::OPEN);  // force open-loop
     }
-    return used;          // tell caller whether we consumed the event
+    return used;
 }

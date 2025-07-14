@@ -15,7 +15,7 @@
 using namespace State;
 
 /* ─── per-board identity (pick UNIQUE 1-255) ───────────────────────── */
-constexpr uint8_t DEVICE_ID = 1;             // ← change per board
+constexpr uint8_t DEVICE_ID = 3;             // ← change per board
 
 /* ─── singletons ───────────────────────────────────────────────────── */
 static std::unique_ptr<IController> gCtrl;
